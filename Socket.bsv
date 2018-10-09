@@ -41,7 +41,7 @@ import Vector :: *;
 
 // Imports from C
 // --------------
-import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create(String name);
+import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create(String name, Bit#(32) dflt_port);
 import "BDPI" function Action serv_socket_init(Bit#(64) ptr);
 import "BDPI" function ActionValue#(Bit#(32))
   serv_socket_get8(Bit#(64) ptr);
@@ -60,12 +60,12 @@ interface Socket#(numeric type n, numeric type m);
   method ActionValue#(Bool) put(Vector#(m, Bit#(8)) data);
 endinterface
 
-module mkSocket#(String name) (Socket#(n,m));
+module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
   Reg#(Bool)      is_initialized <- mkReg(False);
   Reg#(Bit#(64)) serv_socket_ptr <- mkRegU;
 
   rule do_init (!is_initialized);
-    let tmp <- serv_socket_create(name);
+    let tmp <- serv_socket_create(name, fromInteger(dflt_port));
     serv_socket_init(tmp);
     serv_socket_ptr <= tmp;
     is_initialized  <= True;

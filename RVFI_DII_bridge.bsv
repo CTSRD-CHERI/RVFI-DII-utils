@@ -34,12 +34,13 @@ import ClientServer :: *;
 import RVFI_DII :: *;
 import Socket::*;
 
-module mkRVFI_DII_bridge(Client#(Bit#(32), RVFI_DII_Execution#(32, 4)));
+module mkRVFI_DII_bridge#(String name, Integer dflt_port)
+  (Client#(Bit#(32), RVFI_DII_Execution#(32, 4)));
   FIFO#(RVFI_DII_Instruction)       instbuf <- mkSizedFIFO(2048);
   FIFO#(Bool)                       haltbuf <- mkSizedFIFO(2048);
   FIFO#(RVFI_DII_Execution#(32, 4)) tracbuf <- mkSizedFIFO(2048);
   Reg#(Bit#(10))                    count   <- mkReg(0);
-  Socket#(8, 88)                   socket   <- mkSocket("RVFI");
+  Socket#(8, 88)                   socket   <- mkSocket(name, dflt_port);
 
   rule receiveInst;
     Maybe#(Vector#(8, Bit#(8))) mBytes <- socket.get;

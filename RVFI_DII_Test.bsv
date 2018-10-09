@@ -33,7 +33,7 @@ import RVFI_DII::*;
 import RVFI_DII_bridge::*;
 
 module mkRVFI_DII_Test(Empty);
-  Client#(Bit#(32), RVFI_DII_Execution#(32, 4)) bridge <- mkRVFI_DII_bridge();
+  Client#(Bit#(32), RVFI_DII_Execution#(32, 4)) bridge <- mkRVFI_DII_bridge("RVFI", 5000);
   FIFO#(RVFI_DII_Execution#(32, 4)) tracebuf <- mkFIFO;
   Reg#(Bit#(64)) count <- mkReg(0);
 

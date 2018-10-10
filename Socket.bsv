@@ -37,8 +37,6 @@ package Socket;
 
 import Vector :: *;
 
-`ifdef SIMULATE
-
 // Imports from C
 // --------------
 import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create(String name, Bit#(32) dflt_port);
@@ -83,5 +81,4 @@ module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
     serv_socket_putN(serv_socket_ptr, fromInteger(valueOf(m)), pack(data));
 endmodule
 
-`endif
 endpackage

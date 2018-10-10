@@ -41,8 +41,8 @@ BSVTST_TOP=RVFI_DII_Test
 all: $(SIMDEST) sim
 
 sim: $(BSVTST_TOP).bsv RVFI_DII_bridge.bsv RVFI_DII.bsv SocketPacketUtils/socket_packet_utils.c
-	$(BSC) -D SIMULATE -sim -g mk$(BSVTST_TOP) -u $(BSVTST_TOP).bsv
-	CC=gcc-4.8 CXX=g++-4.8 $(BSC) -D SIMULATE -sim -o mk$(BSVTST_TOP) -e mk$(BSVTST_TOP) mk$(BSVTST_TOP).ba SocketPacketUtils/socket_packet_utils.c
+	$(BSC) -sim -g mk$(BSVTST_TOP) -u $(BSVTST_TOP).bsv
+	CC=gcc-4.8 CXX=g++-4.8 $(BSC) -sim -o mk$(BSVTST_TOP) -e mk$(BSVTST_TOP) mk$(BSVTST_TOP).ba SocketPacketUtils/socket_packet_utils.c
 	ln -s -f mk$(BSVTST_TOP)    sim
 	ln -s -f mk$(BSVTST_TOP).so sim.so
 

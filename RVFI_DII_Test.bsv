@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2018 Jonathan Woodruff
+ * Copyright (c) 2018 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -41,8 +42,24 @@ module mkRVFI_DII_Test(Empty);
     Bit#(32) insn <- bridge.request.get();
    $display("%x", insn);
     tracebuf.enq(RVFI_DII_Execution{
+      rvfi_order: count,
+      rvfi_trap:  ?,
+      rvfi_halt:  ?,
+      rvfi_intr:  ?,
       rvfi_insn: insn,
-      rvfi_order: count
+      rvfi_rs1_addr:  ?,
+      rvfi_rs2_addr:  ?,
+      rvfi_rs1_data:  ?,
+      rvfi_rs2_data:  ?,
+      rvfi_pc_rdata:  ?,
+      rvfi_pc_wdata:  ?,
+      rvfi_mem_wdata: ?,
+      rvfi_rd_addr:   ?,
+      rvfi_rd_wdata:  ?,
+      rvfi_mem_addr:  ?,
+      rvfi_mem_rmask: ?,
+      rvfi_mem_wmask: ?,
+      rvfi_mem_rdata: ?
     });
     count <= count + 1;
   endrule

@@ -63,7 +63,24 @@ module mkRVFI_DII_bridge#(String name, Integer dflt_port)
 
   rule pushHalt(haltbuf.first);
     Vector#(88, Bit#(8)) traceBytes = unpack(pack(RVFI_DII_Execution_ByteStream{
-      rvfi_halt: 1
+      rvfi_order: ?,
+      rvfi_trap:  ?,
+      rvfi_halt:  1,
+      rvfi_intr:  ?,
+      rvfi_insn:  ?,
+      rvfi_rs1_addr:  ?,
+      rvfi_rs2_addr:  ?,
+      rvfi_rs1_data:  ?,
+      rvfi_rs2_data:  ?,
+      rvfi_pc_rdata:  ?,
+      rvfi_pc_wdata:  ?,
+      rvfi_mem_wdata: ?,
+      rvfi_rd_addr:   ?,
+      rvfi_rd_wdata:  ?,
+      rvfi_mem_addr:  ?,
+      rvfi_mem_rmask: ?,
+      rvfi_mem_wmask: ?,
+      rvfi_mem_rdata: ?
     }));
     Bool sent <- socket.put(traceBytes);
     if (sent) begin

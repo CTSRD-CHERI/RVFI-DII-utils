@@ -30,42 +30,43 @@
 import FIFO::*;
 import GetPut::*;
 import ClientServer::*;
+import Connectable :: *;
 import RVFI_DII::*;
-import RVFI_DII_bridge::*;
+import RVFI_DII_Bridge::*;
 
-module mkRVFI_DII_Test(Empty);
-  Client#(Bit#(32), RVFI_DII_Execution#(32, 4)) bridge <- mkRVFI_DII_bridge("RVFI", 5000);
+module mkDUT (RVFI_DII_Server);
   FIFO#(RVFI_DII_Execution#(32, 4)) tracebuf <- mkFIFO;
   Reg#(Bit#(64)) count <- mkReg(0);
+  interface Put request;
+    method put(inst) = action
+      tracebuf.enq(RVFI_DII_Execution{
+        rvfi_order: count,
+        rvfi_trap:  ?,
+        rvfi_halt:  ?,
+        rvfi_intr:  ?,
+        rvfi_insn: inst,
+        rvfi_rs1_addr:  ?,
+        rvfi_rs2_addr:  ?,
+        rvfi_rs1_data:  ?,
+        rvfi_rs2_data:  ?,
+        rvfi_pc_rdata:  ?,
+        rvfi_pc_wdata:  ?,
+        rvfi_mem_wdata: ?,
+        rvfi_rd_addr:   ?,
+        rvfi_rd_wdata:  ?,
+        rvfi_mem_addr:  ?,
+        rvfi_mem_rmask: ?,
+        rvfi_mem_wmask: ?,
+        rvfi_mem_rdata: ?
+      });
+      count <= count + 1;
+    endaction;
+  endinterface
+  interface response = toGet(tracebuf);
+endmodule
 
-  rule doInst;
-    Bit#(32) insn <- bridge.request.get();
-   $display("%x", insn);
-    tracebuf.enq(RVFI_DII_Execution{
-      rvfi_order: count,
-      rvfi_trap:  ?,
-      rvfi_halt:  ?,
-      rvfi_intr:  ?,
-      rvfi_insn: insn,
-      rvfi_rs1_addr:  ?,
-      rvfi_rs2_addr:  ?,
-      rvfi_rs1_data:  ?,
-      rvfi_rs2_data:  ?,
-      rvfi_pc_rdata:  ?,
-      rvfi_pc_wdata:  ?,
-      rvfi_mem_wdata: ?,
-      rvfi_rd_addr:   ?,
-      rvfi_rd_wdata:  ?,
-      rvfi_mem_addr:  ?,
-      rvfi_mem_rmask: ?,
-      rvfi_mem_wmask: ?,
-      rvfi_mem_rdata: ?
-    });
-    count <= count + 1;
-  endrule
-
-  rule deliverTrace;
-    bridge.response.put(tracebuf.first);
-    tracebuf.deq;
-  endrule
+module mkRVFI_DII_Test(Empty);
+  RVFI_DII_Bridge bridge <- mkRVFI_DII_Bridge("RVFI_DII", 5000);
+  RVFI_DII_Server    dut <- mkDUT(reset_by bridge.new_rst);
+  mkConnection(bridge.inst, dut);
 endmodule

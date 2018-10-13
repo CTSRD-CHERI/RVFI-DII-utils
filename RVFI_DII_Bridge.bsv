@@ -32,7 +32,7 @@ import FIFO :: *;
 import FIFOF :: *;
 import GetPut :: *;
 import ClientServer :: *;
-import RVFI_DII :: *;
+import RVFI_DII_Types :: *;
 import Socket::*;
 import Clocks :: *;
 

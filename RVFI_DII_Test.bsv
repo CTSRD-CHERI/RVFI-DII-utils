@@ -32,7 +32,6 @@ import GetPut::*;
 import ClientServer::*;
 import Connectable :: *;
 import RVFI_DII::*;
-import RVFI_DII_Bridge::*;
 
 module mkDUT (RVFI_DII_Server);
   let tracebuf <- mkFIFO;

@@ -2,7 +2,7 @@
  * Copyright (c) 2018 Matthew Naylor
  * Copyright (c) 2018 Alexandre Joannou
  * All rights reserved.
- * 
+ *
  * This software was partly developed by the University of Cambridge
  * Computer Laboratory as part of the Partially-Ordered Event-Triggered
  * Systems (POETS) project, funded by EPSRC grant EP/N031768/1.
@@ -76,7 +76,7 @@ module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
     if (res[valueOf(n)] == 0) return Valid(init(res));
     else return Invalid;
   endactionvalue;
-    
+
   method put(data) if (is_initialized) =
     serv_socket_putN(serv_socket_ptr, fromInteger(valueOf(m)), pack(data));
 endmodule

@@ -35,16 +35,16 @@ import RVFI_DII::*;
 import RVFI_DII_Bridge::*;
 
 module mkDUT (RVFI_DII_Server);
-  FIFO#(RVFI_DII_Execution#(32, 4)) tracebuf <- mkFIFO;
-  Reg#(Bit#(64)) count <- mkReg(0);
+  let tracebuf <- mkFIFO;
+  let    count <- mkReg(0);
   interface Put request;
     method put(inst) = action
       tracebuf.enq(RVFI_DII_Execution{
-        rvfi_order: count,
-        rvfi_trap:  ?,
-        rvfi_halt:  ?,
-        rvfi_intr:  ?,
-        rvfi_insn: inst,
+        rvfi_order:     count,
+        rvfi_trap:      ?,
+        rvfi_halt:      ?,
+        rvfi_intr:      ?,
+        rvfi_insn:      inst,
         rvfi_rs1_addr:  ?,
         rvfi_rs2_addr:  ?,
         rvfi_rs1_data:  ?,
@@ -66,7 +66,7 @@ module mkDUT (RVFI_DII_Server);
 endmodule
 
 module mkRVFI_DII_Test(Empty);
-  RVFI_DII_Bridge bridge <- mkRVFI_DII_Bridge("RVFI_DII", 5000);
-  RVFI_DII_Server    dut <- mkDUT(reset_by bridge.new_rst);
+  let bridge <- mkRVFI_DII_Bridge("RVFI_DII", 5000);
+  let    dut <- mkDUT(reset_by bridge.new_rst);
   mkConnection(bridge.inst, dut);
 endmodule

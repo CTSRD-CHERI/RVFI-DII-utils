@@ -43,33 +43,36 @@ interface RVFI_DII_Bridge;
   interface RVFI_DII_Client inst;
 endinterface
 
+Bit#(0) dontCare = ?;
 module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
-  // handle different Reset
-  Clock clk      <- exposeCurrentClock;
-  Reset rst      <- exposeCurrentReset;
-  MakeResetIfc r <- mkReset(0, True, clk);
-  let reqff      <- mkSyncFIFO(2048, clk, rst, clk);
-  let rspff      <- mkSyncFIFO(10, clk, r.new_rst, clk);
+  // handle buffers with different Reset
+  let    clk <- exposeCurrentClock;
+  let    rst <- exposeCurrentReset;
+  let newRst <- mkReset(0, True, clk);
+  let  reqff <- mkSyncFIFO(2048, clk, rst, clk);
+  let  rspff <- mkSyncFIFO(10, clk, newRst.new_rst, clk);
   // local state
-  FIFO#(RVFI_DII_Execution#(32, 4)) traceBuf <- mkSizedFIFO(2048);
-  FIFOF#(Bit#(0))                    haltBuf <- mkSizedFIFOF(10);
-  FIFO#(Bit#(0))                 tracesQueue <- mkSizedFIFO(10);
-  Reg#(Bit#(10))                 countInstIn <- mkReg(0);
-  Reg#(Bit#(10))                countInstOut <- mkReg(0);
-  Socket#(8, 88)                    socket   <- mkSocket(name, dflt_port);
+  let     traceBuf <- mkSizedFIFO(2048);
+  let      haltBuf <- mkSizedFIFOF(10);
+  let  tracesQueue <- mkSizedFIFO(10);
+  let  countInstIn <- mkReg(0);
+  let countInstOut <- mkReg(0);
+  let       socket <- mkSocket(name, dflt_port);
 
+  // receive an RVFI_DII command from a socket and dispatch it
   rule receiveCmd(!haltBuf.notEmpty);
-    Maybe#(Vector#(8, Bit#(8))) mBytes <- socket.get;
+    let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));
       Bool halt = (cmd.rvfi_cmd == 0);
       if (!halt) begin
         reqff.enq(byteStream2rvfiInst(cmd).rvfi_insn);
         countInstIn <= countInstIn + 1;
-      end else haltBuf.enq(?);
+      end else haltBuf.enq(dontCare);
     end
   endrule
 
+  // handle the different kinds of execution traces
   (* descending_urgency = "handleITrace, handleReset"*)
   rule handleITrace;
     traceBuf.enq(rspff.first);
@@ -77,7 +80,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
     countInstOut <= countInstOut + 1;
   endrule
   rule handleReset(haltBuf.notEmpty && countInstIn == countInstOut);
-    r.assertReset;
+    newRst.assertReset;
     haltBuf.deq;
     countInstIn  <= 0;
     countInstOut <= 0;
@@ -101,9 +104,10 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
       rvfi_mem_wmask: ?,
       rvfi_mem_rdata: ?
     });
-    tracesQueue.enq(?);
+    tracesQueue.enq(dontCare);
   endrule
 
+  // send execution traces back through the socket
   rule drainTrace;
     Vector#(88, Bit#(8)) traceBytes = unpack(pack(rvfi2byteStream(traceBuf.first)));
     Bool sent <- socket.put(traceBytes);
@@ -113,7 +117,8 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
     end
   endrule
 
-  interface new_rst = r.new_rst;
+  // wire up interfaces
+  interface new_rst = newRst.new_rst;
   interface Client inst;
     interface Get request;
       method get = actionvalue reqff.deq; return reqff.first; endactionvalue;
@@ -122,4 +127,5 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
       method put(trace) = action rspff.enq(trace); endaction;
     endinterface
   endinterface
+
 endmodule

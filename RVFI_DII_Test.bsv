@@ -33,7 +33,7 @@ import ClientServer::*;
 import Connectable :: *;
 import RVFI_DII::*;
 
-module mkDUT (RVFI_DII_Server);
+module mkDUT (RVFI_DII_Server #(xlen));
   let tracebuf <- mkFIFO;
   let    count <- mkReg(0);
   interface Put request;

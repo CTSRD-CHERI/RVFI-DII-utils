@@ -67,13 +67,13 @@ typedef struct {
                                   //                                      is set). *Should* be straightforward.
 
     // Not explicitly given, but calculable from opcode/funct3 from ISA_Decls.
-    Bit#(masklen) rvfi_mem_rmask; // [562 - 569] Read mask:               Indicates valid bytes read. 0 if unused.
-    Bit#(masklen) rvfi_mem_wmask; // [570 - 577] Write mask:              Indicates valid bytes written. 0 if unused.
+    Bit#(TDiv#(xlen,8)) rvfi_mem_rmask; // [562 - 569] Read mask:               Indicates valid bytes read. 0 if unused.
+    Bit#(TDiv#(xlen,8)) rvfi_mem_wmask; // [570 - 577] Write mask:              Indicates valid bytes written. 0 if unused.
 
     // XXX: SC writes something other than read value, but the value that would be read is unimportant.
     // Unsure what the point of this is, it's only relevant when the value is going to be in rd anyway.
     Bit#(xlen)    rvfi_mem_rdata; // [578 - 641] Read data:               Data read from mem_addr (i.e. before write)
-} RVFI_DII_Execution#(numeric type xlen, numeric type masklen) deriving (Bits, Eq);
+} RVFI_DII_Execution#(numeric type xlen) deriving (Bits, Eq);
 
 typedef struct {
     Bit#(8)  rvfi_intr;      // [066 - 066] Trap handler:            Set for first instruction in trap handler.
@@ -106,9 +106,9 @@ typedef struct {
     //Bit#(64) rvfi_valid;     // Valid signal:                        Instruction was committed properly.
 } RVFI_DII_Execution_ByteStream deriving (Bits, Eq); // 88 Bytes
 
-function RVFI_DII_Execution#(xlen, masklen) byteStream2rvfi(RVFI_DII_Execution_ByteStream b)
-  provisos (Add#(a__, masklen, 8), Add#(b__, xlen, 64));
-  RVFI_DII_Execution#(xlen, masklen) r = RVFI_DII_Execution{
+function RVFI_DII_Execution#(xlen) byteStream2rvfi(RVFI_DII_Execution_ByteStream b)
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
+  RVFI_DII_Execution#(xlen) r = RVFI_DII_Execution{
     rvfi_order:     b.rvfi_order,
     rvfi_trap:      b.rvfi_trap==1,
     rvfi_halt:      b.rvfi_halt==1,
@@ -131,8 +131,8 @@ function RVFI_DII_Execution#(xlen, masklen) byteStream2rvfi(RVFI_DII_Execution_B
   return r;
 endfunction
 
-function RVFI_DII_Execution_ByteStream rvfi2byteStream(RVFI_DII_Execution#(xlen, masklen) r)
-  provisos (Add#(a__, masklen, 8), Add#(b__, xlen, 64));
+function RVFI_DII_Execution_ByteStream rvfi2byteStream(RVFI_DII_Execution#(xlen) r)
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
   RVFI_DII_Execution_ByteStream b = RVFI_DII_Execution_ByteStream{
     rvfi_order:     r.rvfi_order,
     rvfi_trap:      r.rvfi_trap?1:0,

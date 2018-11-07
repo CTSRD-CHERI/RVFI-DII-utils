@@ -36,15 +36,16 @@ import RVFI_DII_Types :: *;
 import Socket::*;
 import Clocks :: *;
 
-typedef Client#(Bit#(32), RVFI_DII_Execution#(32, 4)) RVFI_DII_Client;
-typedef Server#(Bit#(32), RVFI_DII_Execution#(32, 4)) RVFI_DII_Server;
-interface RVFI_DII_Bridge;
+typedef Client#(Bit#(32), RVFI_DII_Execution#(xlen)) RVFI_DII_Client#(numeric type xlen);
+typedef Server#(Bit#(32), RVFI_DII_Execution#(xlen)) RVFI_DII_Server#(numeric type xlen);
+interface RVFI_DII_Bridge #(numeric type xlen);
   interface Reset new_rst;
-  interface RVFI_DII_Client inst;
+  interface RVFI_DII_Client #(xlen) inst;
 endinterface
 
 Bit#(0) dontCare = ?;
-module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge);
+module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen))
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
   // handle buffers with different Reset
   let    clk <- exposeCurrentClock;
   let    rst <- exposeCurrentReset;

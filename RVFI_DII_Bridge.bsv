@@ -32,6 +32,7 @@ import Vector :: *;
 import FIFO :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
+import FIFOLevel :: *;
 import GetPut :: *;
 import ClientServer :: *;
 import Connectable :: *;
@@ -62,20 +63,21 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   let    rst <- exposeCurrentReset;
   let newRst <- mkReset(0, True, clk);
   let  reqff <- mkSyncFIFO(2048, clk, rst, clk);
-  let  rspff <- mkSyncFIFO(10, clk, newRst.new_rst, clk);
+  let  rspff <- mkSyncFIFO(8, clk, newRst.new_rst, clk);
   // local state
   let     traceBuf <- mkSizedFIFO(2048);
-  let      haltBuf <- mkSizedFIFOF(10);
-  let  tracesQueue <- mkSizedFIFO(10);
+  SyncFIFOCountIfc#(Bit#(0), 8) haltBuf <- mkSyncFIFOCount(clk, rst, clk);
+  let  tracesQueue <- mkSizedFIFO(8);
   let  countInstIn <- mkReg(0);
   let countInstOut <- mkReg(0);
   let       socket <- mkSocket(name, dflt_port);
-  let   seqNumBuff <- mkReg(0);
+  let   seqNumBuff <- mkRegU;
   //Array of recently inserted instructions to replay in event of mispredict/trap
-  Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkReg(0));
+  Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkRegU);
 
   // receive an RVFI_DII command from a socket and dispatch it
-  rule receiveCmd(!haltBuf.notEmpty);
+  (* descending_urgency = "handleReset, receiveCmd" *)
+  rule receiveCmd(!haltBuf.dNotEmpty);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));
@@ -94,7 +96,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
     rspff.deq;
     countInstOut <= countInstOut + 1;
   endrule
-  rule handleReset(haltBuf.notEmpty && countInstIn == countInstOut);
+  rule handleReset(haltBuf.dNotEmpty && countInstIn == countInstOut);
     newRst.assertReset;
     haltBuf.deq;
     countInstIn  <= 0;
@@ -136,7 +138,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   // wire up interfaces
   interface new_rst = newRst.new_rst;
   interface RVFI_DII_Client client;
-      method ActionValue#(Bit#(32)) getInst (UInt#(seq_len) seqReq) if (haltBuf.notEmpty);
+      method ActionValue#(Bit#(32)) getInst (UInt#(seq_len) seqReq) if (haltBuf.dNotEmpty);
           if (seqReq == seqNumBuff) begin
               reqff.deq;
               seqNumBuff <= seqNumBuff + 1;

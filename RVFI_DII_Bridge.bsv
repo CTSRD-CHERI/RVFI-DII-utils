@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2018 Jonathan Woodruff
  * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Peter Rugg
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -30,21 +31,31 @@
 import Vector :: *;
 import FIFO :: *;
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 import GetPut :: *;
 import ClientServer :: *;
+import Connectable :: *;
 import RVFI_DII_Types :: *;
-import Socket::*;
+import Socket :: *;
 import Clocks :: *;
 
-typedef Client#(Bit#(32), RVFI_DII_Execution#(xlen)) RVFI_DII_Client#(numeric type xlen);
-typedef Server#(Bit#(32), RVFI_DII_Execution#(xlen)) RVFI_DII_Server#(numeric type xlen);
-interface RVFI_DII_Bridge #(numeric type xlen);
+
+interface RVFI_DII_Client#(numeric type xlen, numeric type seq_len);
+    method ActionValue#(Bit#(32)) getInst(UInt#(seq_len) seqReq);
+    interface Put#(RVFI_DII_Execution#(xlen)) report;
+endinterface
+
+interface RVFI_DII_Server#(numeric type xlen, numeric type seq_len);
+    interface Get#(RVFI_DII_Execution#(xlen)) report;
+endinterface
+
+interface RVFI_DII_Bridge #(numeric type xlen, numeric type seq_len);
   interface Reset new_rst;
-  interface RVFI_DII_Client #(xlen) inst;
+  interface RVFI_DII_Client #(xlen, seq_len) client;
 endinterface
 
 Bit#(0) dontCare = ?;
-module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen))
+module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, seq_len))
   provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
   // handle buffers with different Reset
   let    clk <- exposeCurrentClock;
@@ -59,6 +70,9 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   let  countInstIn <- mkReg(0);
   let countInstOut <- mkReg(0);
   let       socket <- mkSocket(name, dflt_port);
+  let   seqNumBuff <- mkReg(0);
+  //Array of recently inserted instructions to replay in event of mispredict/trap
+  Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkReg(0));
 
   // receive an RVFI_DII command from a socket and dispatch it
   rule receiveCmd(!haltBuf.notEmpty);
@@ -85,6 +99,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
     haltBuf.deq;
     countInstIn  <= 0;
     countInstOut <= 0;
+    seqNumBuff <= 0;
     traceBuf.enq(RVFI_DII_Execution{
       rvfi_order: ?,
       rvfi_trap:  ?,
@@ -120,13 +135,18 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
 
   // wire up interfaces
   interface new_rst = newRst.new_rst;
-  interface Client inst;
-    interface Get request;
-      method get = actionvalue reqff.deq; return reqff.first; endactionvalue;
-    endinterface
-    interface Put response;
-      method put(trace) = action rspff.enq(trace); endaction;
-    endinterface
+  interface RVFI_DII_Client client;
+      method ActionValue#(Bit#(32)) getInst (UInt#(seq_len) seqReq) if (haltBuf.notEmpty);
+          if (seqReq == seqNumBuff) begin
+              reqff.deq;
+              seqNumBuff <= seqNumBuff + 1;
+              recentIns[seqNumBuff] <= reqff.first;
+              return reqff.first;
+          end else begin
+              return recentIns[seqReq];
+          end
+      endmethod
+      interface Put report = toPut(rspff);
   endinterface
 
 endmodule

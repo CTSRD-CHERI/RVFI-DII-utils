@@ -40,6 +40,7 @@ import RVFI_DII_Types :: *;
 import Socket :: *;
 import Clocks :: *;
 
+typedef 2048 MaxDepth;
 
 interface RVFI_DII_Client#(numeric type xlen, numeric type seq_len);
     method ActionValue#(Bit#(32)) getInst(UInt#(seq_len) seqReq);
@@ -62,14 +63,14 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   let    clk <- exposeCurrentClock;
   let    rst <- exposeCurrentReset;
   let newRst <- mkReset(0, True, clk);
-  let  reqff <- mkSyncFIFO(2048, clk, rst, clk);
+  let  reqff <- mkSyncFIFO(valueOf(MaxDepth), clk, rst, clk);
   let  rspff <- mkSyncFIFO(8, clk, newRst.new_rst, clk);
   // local state
-  let     traceBuf <- mkSizedFIFO(2048);
+  let     traceBuf <- mkSizedFIFO(valueOf(MaxDepth));
   SyncFIFOCountIfc#(Bit#(0), 8) haltBuf <- mkSyncFIFOCount(clk, rst, clk);
   let  tracesQueue <- mkSizedFIFO(8);
-  let  countInstIn <- mkReg(0);
-  let countInstOut <- mkReg(0);
+  Reg#(Bit#(TLog#(MaxDepth)))  countInstIn <- mkReg(0);
+  Reg#(Bit#(TLog#(MaxDepth))) countInstOut <- mkReg(0);
   let       socket <- mkSocket(name, dflt_port);
   let   seqNumBuff <- mkRegU;
   //Array of recently inserted instructions to replay in event of mispredict/trap
@@ -77,7 +78,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
 
   // receive an RVFI_DII command from a socket and dispatch it
   (* descending_urgency = "handleReset, receiveCmd" *)
-  rule receiveCmd(!haltBuf.dNotEmpty);
+  rule receiveCmd(!haltBuf.sNotEmpty);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));

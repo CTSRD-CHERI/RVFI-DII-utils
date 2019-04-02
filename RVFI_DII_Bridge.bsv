@@ -77,7 +77,6 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkRegU);
 
   // receive an RVFI_DII command from a socket and dispatch it
-  (* descending_urgency = "handleReset, receiveCmd" *)
   rule receiveCmd(!haltBuf.sNotEmpty);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
@@ -91,12 +90,12 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   endrule
 
   // handle the different kinds of execution traces
-  (* descending_urgency = "handleITrace, handleReset"*)
-  rule handleITrace;
+  rule handleITrace(!(haltBuf.dNotEmpty && countInstIn == countInstOut));
     traceBuf.enq(rspff.first);
     rspff.deq;
     countInstOut <= countInstOut + 1;
   endrule
+  (* fire_when_enabled *)
   rule handleReset(haltBuf.dNotEmpty && countInstIn == countInstOut);
     newRst.assertReset;
     haltBuf.deq;

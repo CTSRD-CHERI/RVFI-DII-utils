@@ -77,7 +77,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkRegU);
 
   // receive an RVFI_DII command from a socket and dispatch it
-  rule receiveCmd(!haltBuf.sNotEmpty);
+  rule receiveCmd(!haltBuf.dNotEmpty);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));

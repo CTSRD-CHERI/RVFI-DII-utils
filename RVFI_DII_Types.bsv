@@ -30,6 +30,10 @@
 import DefaultValue :: *;
 //import ISA_Decls :: *;
 
+typedef 'h80000000 RVFI_DII_Mem_Start;
+typedef 'h00010000 RVFI_DII_Mem_Size; //64KiB
+typedef TAdd#(RVFI_DII_Mem_Start, RVFI_DII_Mem_Size) RVFI_DII_Mem_End;
+
 // Define instruction and register sizes
 
 // Clifford Wolf RISC-V Formal Interface

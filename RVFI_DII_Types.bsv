@@ -55,7 +55,7 @@ typedef struct {
     Bit#(xlen)    rvfi_pc_wdata;  // [301 - 364] PC after instr:          Following PC - either PC + 4 or jump target.
 
     // PROBLEM: LR/SC, if SC fails then value is not written. Indicate as wmask = 0.
-    Bit#(xlen)    rvfi_mem_wdata; // [365 - 428] Write data:              Data written to memory by this command.
+    Bit#(memwidth)    rvfi_mem_wdata; // [365 - 428] Write data:              Data written to memory by this command.
 
     // Found in ALU if used, not 0'd if not used. Check opcode/op_stage2.
     // PROBLEM: LD/AMO - then found in stage 2.
@@ -67,13 +67,13 @@ typedef struct {
                                   //                                      is set). *Should* be straightforward.
 
     // Not explicitly given, but calculable from opcode/funct3 from ISA_Decls.
-    Bit#(TDiv#(xlen,8)) rvfi_mem_rmask; // [562 - 569] Read mask:               Indicates valid bytes read. 0 if unused.
-    Bit#(TDiv#(xlen,8)) rvfi_mem_wmask; // [570 - 577] Write mask:              Indicates valid bytes written. 0 if unused.
+    Bit#(TDiv#(memwidth,8)) rvfi_mem_rmask; // [562 - 569] Read mask:               Indicates valid bytes read. 0 if unused.
+    Bit#(TDiv#(memwidth,8)) rvfi_mem_wmask; // [570 - 577] Write mask:              Indicates valid bytes written. 0 if unused.
 
     // XXX: SC writes something other than read value, but the value that would be read is unimportant.
     // Unsure what the point of this is, it's only relevant when the value is going to be in rd anyway.
     Bit#(xlen)    rvfi_mem_rdata; // [578 - 641] Read data:               Data read from mem_addr (i.e. before write)
-} RVFI_DII_Execution#(numeric type xlen) deriving (Bits, Eq);
+} RVFI_DII_Execution#(numeric type xlen, numeric type memwidth) deriving (Bits, Eq);
 
 typedef struct {
     Bit#(8)  rvfi_intr;      // [066 - 066] Trap handler:            Set for first instruction in trap handler.
@@ -106,9 +106,9 @@ typedef struct {
     //Bit#(64) rvfi_valid;     // Valid signal:                        Instruction was committed properly.
 } RVFI_DII_Execution_ByteStream deriving (Bits, Eq); // 88 Bytes
 
-function RVFI_DII_Execution#(xlen) byteStream2rvfi(RVFI_DII_Execution_ByteStream b)
-  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
-  RVFI_DII_Execution#(xlen) r = RVFI_DII_Execution{
+function RVFI_DII_Execution#(xlen,memwidth) byteStream2rvfi(RVFI_DII_Execution_ByteStream b)
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
+  RVFI_DII_Execution#(xlen,memwidth) r = RVFI_DII_Execution{
     rvfi_order:     b.rvfi_order,
     rvfi_trap:      b.rvfi_trap==1,
     rvfi_halt:      b.rvfi_halt==1,
@@ -131,8 +131,8 @@ function RVFI_DII_Execution#(xlen) byteStream2rvfi(RVFI_DII_Execution_ByteStream
   return r;
 endfunction
 
-function RVFI_DII_Execution_ByteStream rvfi2byteStream(RVFI_DII_Execution#(xlen) r)
-  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
+function RVFI_DII_Execution_ByteStream rvfi2byteStream(RVFI_DII_Execution#(xlen,memwidth) r)
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
   RVFI_DII_Execution_ByteStream b = RVFI_DII_Execution_ByteStream{
     rvfi_order:     r.rvfi_order,
     rvfi_trap:      r.rvfi_trap?1:0,

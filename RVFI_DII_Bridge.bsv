@@ -42,23 +42,23 @@ import Clocks :: *;
 
 typedef 2048 MaxDepth;
 
-interface RVFI_DII_Client#(numeric type xlen, numeric type seq_len);
+interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth, numeric type seq_len);
     method ActionValue#(Bit#(32)) getInst(UInt#(seq_len) seqReq);
-    interface Put#(RVFI_DII_Execution#(xlen)) report;
+    interface Put#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
 
-interface RVFI_DII_Server#(numeric type xlen, numeric type seq_len);
-    interface Get#(RVFI_DII_Execution#(xlen)) report;
+interface RVFI_DII_Server#(numeric type xlen, numeric type memwidth, numeric type seq_len);
+    interface Get#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
 
-interface RVFI_DII_Bridge #(numeric type xlen, numeric type seq_len);
+interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth, numeric type seq_len);
   interface Reset new_rst;
-  interface RVFI_DII_Client #(xlen, seq_len) client;
+  interface RVFI_DII_Client #(xlen,memwidth,seq_len) client;
 endinterface
 
 Bit#(0) dontCare = ?;
-module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, seq_len))
-  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64));
+module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, memwidth, seq_len))
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
   // handle buffers with different Reset
   let    clk <- exposeCurrentClock;
   let    rst <- exposeCurrentReset;

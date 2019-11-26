@@ -63,16 +63,16 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   let    clk <- exposeCurrentClock;
   let    rst <- exposeCurrentReset;
   let newRst <- mkReset(0, True, clk);
-  let  reqff <- mkSyncFIFO(valueOf(MaxDepth), clk, rst, clk);
+  SyncFIFOIfc#(Bit#(32)) reqff <- mkSyncFIFO(valueOf(MaxDepth), clk, rst, clk);
   let  rspff <- mkSyncFIFO(8, clk, newRst.new_rst, clk);
   // local state
-  let     traceBuf <- mkSizedFIFO(valueOf(MaxDepth));
+  FIFO#(RVFI_DII_Execution#(xlen,memwidth)) traceBuf <- mkSizedFIFO(valueOf(MaxDepth));
   SyncFIFOCountIfc#(Bit#(0), 8) haltBuf <- mkSyncFIFOCount(clk, rst, clk);
-  let  tracesQueue <- mkSizedFIFO(8);
+  FIFO#(Bit#(0))         tracesQueue <- mkSizedFIFO(8);
   Reg#(Bit#(TLog#(MaxDepth)))  countInstIn <- mkReg(0);
   Reg#(Bit#(TLog#(MaxDepth))) countInstOut <- mkReg(0);
   let       socket <- mkSocket(name, dflt_port);
-  let   seqNumBuff <- mkRegU;
+  Reg#(UInt#(seq_len)) seqNumBuff <- mkRegU;
   //Array of recently inserted instructions to replay in event of mispredict/trap
   Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkRegU);
 

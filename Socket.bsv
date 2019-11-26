@@ -39,6 +39,7 @@ import Vector :: *;
 
 // Imports from C
 // --------------
+import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create_nameless(Bit#(32) dflt_port);
 import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create(String name, Bit#(32) dflt_port);
 import "BDPI" function Action serv_socket_init(Bit#(64) ptr);
 import "BDPI" function ActionValue#(Bit#(32))
@@ -63,22 +64,32 @@ module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
   Reg#(Bit#(64)) serv_socket_ptr <- mkRegU;
 
   rule do_init (!is_initialized);
-    let tmp <- serv_socket_create(name, fromInteger(dflt_port));
+    Bit#(64) tmp = ?;
+    if (name == "") tmp <- serv_socket_create_nameless(fromInteger(dflt_port));
+    else tmp <- serv_socket_create(name, fromInteger(dflt_port));
     serv_socket_init(tmp);
     serv_socket_ptr <= tmp;
     is_initialized  <= True;
   endrule
 
   method get if (is_initialized) = actionvalue
-    Bit#(TMul#(TAdd#(n, 1), 8)) tmp
-      <- serv_socket_getN(serv_socket_ptr, fromInteger(valueOf(n)));
-    Vector#(TAdd#(n, 1), Bit#(8)) res = unpack(tmp);
-    if (res[valueOf(n)] == 0) return Valid(init(res));
+    Vector#(n, Bit#(8)) res = replicate(0);
+    Bit#(32) retVal = 0;
+    for (Integer i = 0; i < valueOf(n); i = i+1) begin
+      if (retVal != -1) retVal <- serv_socket_get8(serv_socket_ptr);
+      if (retVal != -1) res[i] = truncate(retVal); 
+    end
+    if (retVal != -1) return Valid(res);
     else return Invalid;
   endactionvalue;
 
-  method put(data) if (is_initialized) =
-    serv_socket_putN(serv_socket_ptr, fromInteger(valueOf(m)), pack(data));
+  method put(data) if (is_initialized) = actionvalue
+    Bool retVal = True;
+    for (Integer i = 0; i < valueOf(m); i = i+1) begin
+      if (retVal) retVal <- serv_socket_put8(serv_socket_ptr, data[i]);
+    end
+    return retVal;
+  endactionvalue;
 endmodule
 
 endpackage

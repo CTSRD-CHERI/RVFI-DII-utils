@@ -77,7 +77,7 @@ typedef struct {
     // XXX: SC writes something other than read value, but the value that would be read is unimportant.
     // Unsure what the point of this is, it's only relevant when the value is going to be in rd anyway.
     Bit#(xlen)    rvfi_mem_rdata; // [578 - 641] Read data:               Data read from mem_addr (i.e. before write)
-} RVFI_DII_Execution#(numeric type xlen, numeric type memwidth) deriving (Bits, Eq);
+} RVFI_DII_Execution#(numeric type xlen, numeric type memwidth) deriving (Bits, Eq, FShow);
 
 typedef struct {
     Bit#(8)  rvfi_intr;      // [066 - 066] Trap handler:            Set for first instruction in trap handler.
@@ -108,7 +108,7 @@ typedef struct {
     Bit#(64) rvfi_pc_rdata;  // [237 - 300] PC before instr:         PC for current instruction
     Bit#(64) rvfi_order;     // [000 - 063] Instruction number:      INSTRET value after completion.
     //Bit#(64) rvfi_valid;     // Valid signal:                        Instruction was committed properly.
-} RVFI_DII_Execution_ByteStream deriving (Bits, Eq); // 88 Bytes
+} RVFI_DII_Execution_ByteStream deriving (Bits, Eq, FShow); // 88 Bytes
 
 function RVFI_DII_Execution#(xlen,memwidth) byteStream2rvfi(RVFI_DII_Execution_ByteStream b)
   provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
@@ -168,7 +168,7 @@ typedef struct {
                         // while shortening counterexamples.
     Bit#(32) rvfi_insn; // [0 - 31] Instruction word: 32-bit instruction or command. The lower 16-bits
                         // may decode to a 16-bit compressed instruction.
-} RVFI_DII_Instruction deriving (Bits, Eq);
+} RVFI_DII_Instruction deriving (Bits, Eq, FShow);
 
 typedef struct {
     Bit#(8)  padding;
@@ -179,7 +179,7 @@ typedef struct {
                         // while shortening counterexamples.
     Bit#(32) rvfi_insn; // [0 - 31] Instruction word: 32-bit instruction or command. The lower 16-bits
                         // may decode to a 16-bit compressed instruction.
-} RVFI_DII_Instruction_ByteStream deriving (Bits, Eq); // 8 bytes
+} RVFI_DII_Instruction_ByteStream deriving (Bits, Eq, FShow); // 8 bytes
 
 function RVFI_DII_Instruction byteStream2rvfiInst(RVFI_DII_Instruction_ByteStream b);
   RVFI_DII_Instruction r = RVFI_DII_Instruction{

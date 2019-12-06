@@ -189,3 +189,8 @@ function RVFI_DII_Instruction byteStream2rvfiInst(RVFI_DII_Instruction_ByteStrea
   };
   return r;
 endfunction
+
+// Convenience types for implementations.
+typedef 2048 MaxDepth;
+typedef Bit#(TLog#(MaxDepth)) Dii_Id;
+Bit#(32) dii_nop = 'h01FFF033;

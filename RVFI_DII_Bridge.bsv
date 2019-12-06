@@ -28,127 +28,134 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import Assert::*;
 import Vector :: *;
 import FIFO :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 import FIFOLevel :: *;
+import RegFile :: * ;
 import GetPut :: *;
 import ClientServer :: *;
 import Connectable :: *;
 import RVFI_DII_Types :: *;
 import Socket :: *;
 import Clocks :: *;
+import ConfigReg :: *;
 
-typedef 2048 MaxDepth;
-
-interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth, numeric type seq_len);
-    method ActionValue#(Bit#(32)) getInst(UInt#(seq_len) seqReq);
+interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth);
+    method ActionValue#(Bit#(32)) getInst(Dii_Id seqReq);
     interface Put#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
 
-interface RVFI_DII_Server#(numeric type xlen, numeric type memwidth, numeric type seq_len);
+interface RVFI_DII_Server#(numeric type xlen, numeric type memwidth);
     interface Get#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
 
-interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth, numeric type seq_len);
+interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth);
   interface Reset new_rst;
-  interface RVFI_DII_Client #(xlen,memwidth,seq_len) client;
+  interface RVFI_DII_Client #(xlen,memwidth) client;
+  method Bool done;
 endinterface
 
-Bit#(0) dontCare = ?;
-module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, memwidth, seq_len))
+module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, memwidth))
   provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
+
   // handle buffers with different Reset
   let    clk <- exposeCurrentClock;
   let    rst <- exposeCurrentReset;
   let newRst <- mkReset(0, True, clk);
-  SyncFIFOIfc#(Bit#(32)) reqff <- mkSyncFIFO(valueOf(MaxDepth), clk, rst, clk);
-  let  rspff <- mkSyncFIFO(8, clk, newRst.new_rst, clk);
-  // local state
-  FIFO#(RVFI_DII_Execution#(xlen,memwidth)) traceBuf <- mkSizedFIFO(valueOf(MaxDepth));
-  SyncFIFOCountIfc#(Bit#(0), 8) haltBuf <- mkSyncFIFOCount(clk, rst, clk);
-  FIFO#(Bit#(0))         tracesQueue <- mkSizedFIFO(8);
-  Reg#(Bit#(TLog#(MaxDepth)))  countInstIn <- mkReg(0);
-  Reg#(Bit#(TLog#(MaxDepth))) countInstOut <- mkReg(0);
-  let       socket <- mkSocket(name, dflt_port);
-  Reg#(UInt#(seq_len)) seqNumBuff <- mkRegU;
-  //Array of recently inserted instructions to replay in event of mispredict/trap
-  Vector#(TExp#(seq_len), Reg#(Bit#(32))) recentIns <- replicateM(mkRegU);
+  Reg#(Bool) doReset <- mkSyncRegToCC(False, clk, newRst.new_rst);
+  Socket#(8, 88) socket <- mkSocket(name, dflt_port);
+  RVFI_DII_Bridge#(xlen, memwidth) bridge <- mkRVFI_DII_Bridge_Core(name, dflt_port, socket, reset_by newRst.new_rst);
+  
+  rule readDone;
+    $display("Reading bridge.done:%d RVFI_DII Bridge", bridge.done);
+    doReset <= bridge.done;
+  endrule
+  
+  rule doResetRule(doReset);
+    $display("Performing reset in RVFI_DII Bridge");
+    newRst.assertReset;
+  endrule
+  
+  interface new_rst = newRst.new_rst;
+  interface RVFI_DII_Client client = bridge.client;
+endmodule
 
-  // receive an RVFI_DII command from a socket and dispatch it
-  rule receiveCmd(!haltBuf.dNotEmpty);
+module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) socket) (RVFI_DII_Bridge #(xlen, memwidth))
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
+  Reg#(Bool) allBuffered <- mkReg(False);
+  Reg#(Dii_Id) countInstIn <- mkReg(0);
+  Reg#(Dii_Id) countInstOut <- mkConfigReg(0);
+  //Array of instructions
+  RegFile#(Dii_Id, Bit#(32)) insts <- mkRegFileFull;
+  
+  rule queTraces(!allBuffered);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));
       Bool halt = (cmd.rvfi_cmd == 0);
       if (!halt) begin
-        reqff.enq(byteStream2rvfiInst(cmd).rvfi_insn);
+        $display("Received instruction RVFI_DII Bridge: ", fshow(cmd));
+        insts.upd(countInstIn, byteStream2rvfiInst(cmd).rvfi_insn);
         countInstIn <= countInstIn + 1;
-      end else haltBuf.enq(dontCare);
+      end else begin
+        // Return the default "nop" in this case.
+        allBuffered <= True;
+        $display("Halt received in RVFI_DII Bridge");
+      end
     end
   endrule
-
-  // handle the different kinds of execution traces
-  rule handleITrace(!(haltBuf.dNotEmpty && countInstIn == countInstOut));
-    traceBuf.enq(rspff.first);
-    rspff.deq;
+  
+  function Action sendRvfiTrace(RVFI_DII_Execution#(xlen,memwidth) rvfiTrace) =
+    action
+      Vector#(88, Bit#(8)) traceBytes = unpack(pack(rvfi2byteStream(rvfiTrace)));
+      $display("Sent RVFI-DII trace: ", fshow(rvfiTrace));
+      Bool sent <- socket.put(traceBytes);
+      dynamicAssert(sent, "RVFI trace failed to send!");
+    endaction;
+  
+  Bool readyToHalt = (allBuffered && countInstOut == countInstIn);
+  rule report_halt(readyToHalt);
+    sendRvfiTrace(RVFI_DII_Execution{
+            rvfi_order: ?,
+            rvfi_trap:  ?,
+            rvfi_halt:  True,
+            rvfi_intr:  ?,
+            rvfi_insn:  ?,
+            rvfi_rs1_addr:  ?,
+            rvfi_rs2_addr:  ?,
+            rvfi_rs1_data:  ?,
+            rvfi_rs2_data:  ?,
+            rvfi_pc_rdata:  ?,
+            rvfi_pc_wdata:  ?,
+            rvfi_mem_wdata: ?,
+            rvfi_rd_addr:   ?,
+            rvfi_rd_wdata:  ?,
+            rvfi_mem_addr:  ?,
+            rvfi_mem_rmask: ?,
+            rvfi_mem_wmask: ?,
+            rvfi_mem_rdata: ?
+          });
+    $display("Sent Halt trace in RVFI_DII Bridge");
     countInstOut <= countInstOut + 1;
-  endrule
-  (* fire_when_enabled *)
-  rule handleReset(haltBuf.dNotEmpty && countInstIn == countInstOut);
-    newRst.assertReset;
-    haltBuf.deq;
-    countInstIn  <= 0;
-    countInstOut <= 0;
-    seqNumBuff <= 0;
-    traceBuf.enq(RVFI_DII_Execution{
-      rvfi_order: ?,
-      rvfi_trap:  ?,
-      rvfi_halt:  True,
-      rvfi_intr:  ?,
-      rvfi_insn:  ?,
-      rvfi_rs1_addr:  ?,
-      rvfi_rs2_addr:  ?,
-      rvfi_rs1_data:  ?,
-      rvfi_rs2_data:  ?,
-      rvfi_pc_rdata:  ?,
-      rvfi_pc_wdata:  ?,
-      rvfi_mem_wdata: ?,
-      rvfi_rd_addr:   ?,
-      rvfi_rd_wdata:  ?,
-      rvfi_mem_addr:  ?,
-      rvfi_mem_rmask: ?,
-      rvfi_mem_wmask: ?,
-      rvfi_mem_rdata: ?
-    });
-    tracesQueue.enq(dontCare);
-  endrule
-
-  // send execution traces back through the socket
-  rule drainTrace;
-    Vector#(88, Bit#(8)) traceBytes = unpack(pack(rvfi2byteStream(traceBuf.first)));
-    Bool sent <- socket.put(traceBytes);
-    if (sent) begin
-      traceBuf.deq;
-      if (traceBuf.first.rvfi_halt) tracesQueue.deq;
-    end
   endrule
 
   // wire up interfaces
-  interface new_rst = newRst.new_rst;
   interface RVFI_DII_Client client;
-      method ActionValue#(Bit#(32)) getInst (UInt#(seq_len) seqReq) if (haltBuf.dNotEmpty);
-          if (seqReq == seqNumBuff) begin
-              reqff.deq;
-              seqNumBuff <= seqNumBuff + 1;
-              recentIns[seqNumBuff] <= reqff.first;
-              return reqff.first;
-          end else begin
-              return recentIns[seqReq];
-          end
+    method ActionValue#(Bit#(32)) getInst (Dii_Id seqReq) if (allBuffered);
+      Bit#(32) nextInst = dii_nop;
+      if (seqReq < countInstIn) nextInst = insts.sub(seqReq);
+      $display("Called getInst in RVFI_DII Bridge, id: %d, inst: %x", seqReq, nextInst);
+      return nextInst;
+    endmethod
+    interface Put report;
+      method Action put(RVFI_DII_Execution#(xlen,memwidth) rvfiTrace) if (!readyToHalt);
+        sendRvfiTrace(rvfiTrace);
+        countInstOut <= countInstOut + 1;
       endmethod
-      interface Put report = toPut(rspff);
+    endinterface
   endinterface
-
+  method Bool done = (allBuffered && (countInstOut == countInstIn + 1));
 endmodule

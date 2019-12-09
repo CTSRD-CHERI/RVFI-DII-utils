@@ -43,34 +43,32 @@ import Socket :: *;
 import Clocks :: *;
 import ConfigReg :: *;
 
-interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth);
-    method ActionValue#(Bit#(32)) getInst(Dii_Id seqReq);
-    interface Put#(RVFI_DII_Execution#(xlen,memwidth)) report;
+interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth, numeric type reqWidth);
+    method ActionValue#(Vector#(reqWidth, Maybe#(Bit#(32)))) getInst(Vector#(reqWidth, Maybe#(Dii_Id)) seqReq);
+    interface Put#(Vector#(reqWidth, Maybe#(RVFI_DII_Execution#(xlen,memwidth)))) report;
 endinterface
 
 interface RVFI_DII_Server#(numeric type xlen, numeric type memwidth);
     interface Get#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
 
-interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth);
+interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth, numeric type reqWidth);
   interface Reset new_rst;
-  interface RVFI_DII_Client #(xlen,memwidth) client;
+  interface RVFI_DII_Client #(xlen,memwidth,reqWidth) client;
   method Bool done;
 endinterface
 
-module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, memwidth))
+module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xlen, memwidth,reqWidth))
   provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
 
   // handle buffers with different Reset
   let    clk <- exposeCurrentClock;
-  let    rst <- exposeCurrentReset;
   let newRst <- mkReset(0, True, clk);
   Reg#(Bool) doReset <- mkSyncRegToCC(False, clk, newRst.new_rst);
   Socket#(8, 88) socket <- mkSocket(name, dflt_port);
-  RVFI_DII_Bridge#(xlen, memwidth) bridge <- mkRVFI_DII_Bridge_Core(name, dflt_port, socket, reset_by newRst.new_rst);
+  RVFI_DII_Bridge#(xlen, memwidth, reqWidth) bridge <- mkRVFI_DII_Bridge_Core(name, dflt_port, socket, reset_by newRst.new_rst);
   
   rule readDone;
-    $display("Reading bridge.done:%d RVFI_DII Bridge", bridge.done);
     doReset <= bridge.done;
   endrule
   
@@ -83,10 +81,10 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   interface RVFI_DII_Client client = bridge.client;
 endmodule
 
-module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) socket) (RVFI_DII_Bridge #(xlen, memwidth))
+module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) socket) (RVFI_DII_Bridge #(xlen, memwidth, reqWidth))
   provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
-  Reg#(Bool) allBuffered <- mkReg(False);
-  Reg#(Dii_Id) countInstIn <- mkReg(0);
+  Reg#(Bool) allBuffered <- mkConfigReg(False);
+  Reg#(Dii_Id) countInstIn <- mkConfigReg(0);
   Reg#(Dii_Id) countInstOut <- mkConfigReg(0);
   //Array of instructions
   RegFile#(Dii_Id, Bit#(32)) insts <- mkRegFileFull;
@@ -144,16 +142,26 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
 
   // wire up interfaces
   interface RVFI_DII_Client client;
-    method ActionValue#(Bit#(32)) getInst (Dii_Id seqReq) if (allBuffered);
-      Bit#(32) nextInst = dii_nop;
-      if (seqReq < countInstIn) nextInst = insts.sub(seqReq);
-      $display("Called getInst in RVFI_DII Bridge, id: %d, inst: %x", seqReq, nextInst);
-      return nextInst;
+    method ActionValue#(Vector#(reqWidth, Maybe#(Bit#(32)))) getInst (Vector#(reqWidth, Maybe#(Dii_Id)) seqReqs) if (allBuffered);
+      Vector#(reqWidth, Maybe#(Bit#(32))) nextInsts = replicate(tagged Invalid);
+      for (Integer i = 0; i < valueOf(reqWidth); i = i + 1) begin
+        if (seqReqs[i] matches tagged Valid .seqReq) begin
+          if (seqReq < countInstIn) nextInsts[i] = tagged Valid insts.sub(seqReq);
+        end
+      end
+      $display("Called getInst in RVFI_DII Bridge ", fshow(seqReqs), fshow(nextInsts));
+      return nextInsts;
     endmethod
     interface Put report;
-      method Action put(RVFI_DII_Execution#(xlen,memwidth) rvfiTrace) if (!readyToHalt);
-        sendRvfiTrace(rvfiTrace);
-        countInstOut <= countInstOut + 1;
+      method Action put(Vector#(reqWidth, Maybe#(RVFI_DII_Execution#(xlen,memwidth))) rvfiTrace) if (!readyToHalt);
+        Dii_Id newCount = countInstOut;
+        for (Integer i = 0; i < valueOf(reqWidth); i = i + 1) begin
+          if (rvfiTrace[i] matches tagged Valid .trace) begin
+            sendRvfiTrace(trace);
+            newCount = newCount + 1;
+          end
+        end
+        countInstOut <= newCount;
       endmethod
     endinterface
   endinterface

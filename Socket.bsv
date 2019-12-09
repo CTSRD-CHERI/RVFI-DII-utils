@@ -36,6 +36,7 @@ package Socket;
 // Access named sockets on the file system in simulation.
 
 import Vector :: *;
+import Clocks :: *;
 
 // Imports from C
 // --------------
@@ -60,7 +61,8 @@ interface Socket#(numeric type n, numeric type m);
 endinterface
 
 module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
-  Reg#(Bool)      is_initialized <- mkReg(False);
+  let    clk <- exposeCurrentClock;
+  Reg#(Bool)      is_initialized <- mkSyncRegFromCC(False, clk);
   Reg#(Bit#(64)) serv_socket_ptr <- mkRegU;
 
   rule do_init (!is_initialized);

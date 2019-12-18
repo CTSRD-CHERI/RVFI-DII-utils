@@ -86,6 +86,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
   Reg#(Bool) allBuffered <- mkConfigReg(False);
   Reg#(Dii_Id) countInstIn <- mkConfigReg(0);
   Reg#(Dii_Id) countInstOut <- mkConfigReg(0);
+  Reg#(Bool) doneReg <- mkConfigReg(False);
   //Array of instructions
   RegFile#(Dii_Id, Bit#(32)) insts <- mkRegFileFull;
   
@@ -115,7 +116,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
     endaction;
   
   Bool readyToHalt = (allBuffered && countInstOut == countInstIn);
-  rule report_halt(readyToHalt);
+  rule report_halt(readyToHalt && !doneReg);
     sendRvfiTrace(RVFI_DII_Execution{
             rvfi_order: ?,
             rvfi_trap:  ?,
@@ -137,7 +138,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
             rvfi_mem_rdata: ?
           });
     $display("Sent Halt trace in RVFI_DII Bridge");
-    countInstOut <= countInstOut + 1;
+    doneReg <= True;
   endrule
 
   // wire up interfaces
@@ -153,7 +154,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
       return nextInsts;
     endmethod
     interface Put report;
-      method Action put(Vector#(reqWidth, Maybe#(RVFI_DII_Execution#(xlen,memwidth))) rvfiTrace) if (!readyToHalt);
+      method Action put(Vector#(reqWidth, Maybe#(RVFI_DII_Execution#(xlen,memwidth))) rvfiTrace) if (!readyToHalt && !doneReg);
         Dii_Id newCount = countInstOut;
         for (Integer i = 0; i < valueOf(reqWidth); i = i + 1) begin
           if (rvfiTrace[i] matches tagged Valid .trace) begin
@@ -165,5 +166,5 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
       endmethod
     endinterface
   endinterface
-  method Bool done = (allBuffered && (countInstOut == countInstIn + 1));
+  method Bool done = doneReg;
 endmodule

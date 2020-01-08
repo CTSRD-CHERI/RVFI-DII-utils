@@ -48,6 +48,11 @@ interface RVFI_DII_Client#(numeric type xlen, numeric type memwidth, numeric typ
     interface Put#(Vector#(reqWidth, Maybe#(RVFI_DII_Execution#(xlen,memwidth)))) report;
 endinterface
 
+interface RVFI_DII_Client_Scalar#(numeric type xlen, numeric type memwidth);
+    method ActionValue#(Maybe#(Bit#(32))) getInst(Dii_Id seqReq);
+    interface Put#(RVFI_DII_Execution#(xlen,memwidth)) report;
+endinterface
+
 interface RVFI_DII_Server#(numeric type xlen, numeric type memwidth);
     interface Get#(RVFI_DII_Execution#(xlen,memwidth)) report;
 endinterface
@@ -55,6 +60,12 @@ endinterface
 interface RVFI_DII_Bridge #(numeric type xlen, numeric type memwidth, numeric type reqWidth);
   interface Reset new_rst;
   interface RVFI_DII_Client #(xlen,memwidth,reqWidth) client;
+  method Bool done;
+endinterface
+
+interface RVFI_DII_Bridge_Scalar #(numeric type xlen, numeric type memwidth);
+  interface Reset new_rst;
+  interface RVFI_DII_Client_Scalar #(xlen,memwidth) client;
   method Bool done;
 endinterface
 
@@ -67,18 +78,38 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
   Reg#(Bool) doReset <- mkSyncRegToCC(False, clk, newRst.new_rst);
   Socket#(8, 88) socket <- mkSocket(name, dflt_port);
   RVFI_DII_Bridge#(xlen, memwidth, reqWidth) bridge <- mkRVFI_DII_Bridge_Core(name, dflt_port, socket, reset_by newRst.new_rst);
-  
+
   rule readDone;
     doReset <= bridge.done;
   endrule
-  
+
   rule doResetRule(doReset);
     $display("Performing reset in RVFI_DII Bridge");
     newRst.assertReset;
   endrule
-  
+
   interface new_rst = newRst.new_rst;
   interface RVFI_DII_Client client = bridge.client;
+endmodule
+
+module mkRVFI_DII_Bridge_Scalar#(String name, Integer dflt_port) (RVFI_DII_Bridge_Scalar #(xlen, memwidth))
+  provisos (Add#(a__, TDiv#(xlen,8), 8), Add#(b__, xlen, 64), Add#(c__, TDiv#(memwidth,8), 8), Add#(d__, memwidth, 64));
+  RVFI_DII_Bridge#(xlen, memwidth, 1) bridge <- mkRVFI_DII_Bridge(name, dflt_port);
+  return interface RVFI_DII_Bridge_Scalar
+    interface new_rst = bridge.new_rst;
+    interface RVFI_DII_Client_Scalar client;
+      method ActionValue#(Maybe#(Bit#(32))) getInst (Dii_Id seqReq);
+        let inst <- bridge.client.getInst(replicate(Valid(seqReq)));
+        return inst[0];
+      endmethod
+      interface Put report;
+        method Action put (RVFI_DII_Execution#(xlen, memwidth) rep);
+          bridge.client.report.put(replicate(Valid(rep)));
+        endmethod
+      endinterface
+    endinterface
+    method Bool done = bridge.done;
+  endinterface;
 endmodule
 
 module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) socket) (RVFI_DII_Bridge #(xlen, memwidth, reqWidth))
@@ -89,7 +120,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
   Reg#(Bool) doneReg <- mkConfigReg(False);
   //Array of instructions
   RegFile#(Dii_Id, Bit#(32)) insts <- mkRegFileFull;
-  
+
   rule queTraces(!allBuffered);
     let mBytes <- socket.get;
     if (mBytes matches tagged Valid .bytes) begin
@@ -106,7 +137,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
       end
     end
   endrule
-  
+
   function Action sendRvfiTrace(RVFI_DII_Execution#(xlen,memwidth) rvfiTrace) =
     action
       Vector#(88, Bit#(8)) traceBytes = unpack(pack(rvfi2byteStream(rvfiTrace)));
@@ -114,7 +145,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
       Bool sent <- socket.put(traceBytes);
       dynamicAssert(sent, "RVFI trace failed to send!");
     endaction;
-  
+
   Bool readyToHalt = (allBuffered && countInstOut == countInstIn);
   rule report_halt(readyToHalt && !doneReg);
     sendRvfiTrace(RVFI_DII_Execution{

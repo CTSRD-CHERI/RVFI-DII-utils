@@ -88,6 +88,7 @@ module mkRVFI_DII_Bridge#(String name, Integer dflt_port) (RVFI_DII_Bridge #(xle
     newRst.assertReset;
   endrule
 
+  interface done = bridge.done;
   interface new_rst = newRst.new_rst;
   interface RVFI_DII_Client client = bridge.client;
 endmodule
@@ -173,6 +174,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
   endrule
 
   // wire up interfaces
+  interface Reset new_rst = error("mkRVFI_DII_Bridge_Core does not provide a reset interface. Did you mean to use mkRVFI_DII_Bridge that wraps this module?");
   interface RVFI_DII_Client client;
     method ActionValue#(Vector#(reqWidth, Maybe#(Bit#(32)))) getInst (Vector#(reqWidth, Maybe#(Dii_Id)) seqReqs) if (allBuffered);
       Vector#(reqWidth, Maybe#(Bit#(32))) nextInsts = replicate(tagged Invalid);

@@ -47,6 +47,8 @@ import "BDPI" function ActionValue#(Bit#(32))
   serv_socket_get8(Bit#(64) ptr);
 import "BDPI" function ActionValue#(Bool)
   serv_socket_put8(Bit#(64) ptr, Bit#(8) b);
+import "BDPI" function ActionValue#(Bool)
+  serv_socket_put8_blocking(Bit#(64) ptr, Bit#(8) b);
 import "BDPI" function ActionValue#(Bit#(n))
   serv_socket_getN(Bit#(64) ptr, Bit#(32) nbytes);
 import "BDPI" function ActionValue#(Bool)
@@ -88,7 +90,7 @@ module mkSocket#(String name, Integer dflt_port) (Socket#(n,m));
   method put(data) if (is_initialized) = actionvalue
     Bool retVal = True;
     for (Integer i = 0; i < valueOf(m); i = i+1) begin
-      if (retVal) retVal <- serv_socket_put8(serv_socket_ptr, data[i]);
+      if (retVal) retVal <- serv_socket_put8_blocking(serv_socket_ptr, data[i]);
     end
     return retVal;
   endactionvalue;

@@ -128,7 +128,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
       RVFI_DII_Instruction_ByteStream cmd = unpack(pack(bytes));
       Bool halt = (cmd.rvfi_cmd == 0);
       if (!halt) begin
-        $display("Received instruction RVFI_DII Bridge: ", fshow(cmd));
+        //$display("Received instruction RVFI_DII Bridge: ", fshow(cmd));
         insts.upd(countInstIn, byteStream2rvfiInst(cmd).rvfi_insn);
         countInstIn <= countInstIn + 1;
       end else begin
@@ -183,7 +183,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
           if (seqReq < countInstIn) nextInsts[i] = tagged Valid insts.sub(seqReq);
         end
       end
-      $display("Called getInst in RVFI_DII Bridge ", fshow(seqReqs), fshow(nextInsts));
+      //$display("Called getInst in RVFI_DII Bridge ", fshow(seqReqs), fshow(nextInsts));
       return nextInsts;
     endmethod
     interface Put report;

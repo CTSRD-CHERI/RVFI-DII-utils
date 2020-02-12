@@ -31,7 +31,7 @@ import DefaultValue :: *;
 //import ISA_Decls :: *;
 
 typedef 'h80000000 RVFI_DII_Mem_Start;
-typedef 'h00010000 RVFI_DII_Mem_Size; //64KiB
+typedef 'h00800000 RVFI_DII_Mem_Size; //8MiB
 typedef TAdd#(RVFI_DII_Mem_Start, RVFI_DII_Mem_Size) RVFI_DII_Mem_End;
 
 // Define instruction and register sizes
@@ -191,6 +191,6 @@ function RVFI_DII_Instruction byteStream2rvfiInst(RVFI_DII_Instruction_ByteStrea
 endfunction
 
 // Convenience types for implementations.
-typedef 2048 MaxDepth;
+typedef 8388608 MaxDepth;
 typedef Bit#(TLog#(MaxDepth)) Dii_Id;
 Bit#(32) dii_nop = 'h01FFF033;

@@ -142,7 +142,7 @@ module mkRVFI_DII_Bridge_Core#(String name, Integer dflt_port, Socket#(8, 88) so
   function Action sendRvfiTrace(RVFI_DII_Execution#(xlen,memwidth) rvfiTrace) =
     action
       Vector#(88, Bit#(8)) traceBytes = unpack(pack(rvfi2byteStream(rvfiTrace)));
-      $display("Sent RVFI-DII trace: ", fshow(rvfiTrace));
+      //$display("Sent RVFI-DII trace: ", fshow(rvfiTrace));
       Bool sent <- socket.put(traceBytes);
       dynamicAssert(sent, "RVFI trace failed to send!");
     endaction;

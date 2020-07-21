@@ -193,4 +193,10 @@ endfunction
 // Convenience types for implementations.
 typedef 8388608 MaxDepth;
 typedef Bit#(TLog#(MaxDepth)) Dii_Id;
+typedef Bit#(TAdd#(TLog#(MaxDepth), 1)) Dii_Parcel_Id;
 Bit#(32) dii_nop = 'h01FFF033;
+
+typedef union tagged {
+    Bit#(16) DIIParcel;
+    Bool     DIINoParcel;
+} RVFI_DII_Parcel_Resp deriving (Bits, Eq, FShow);

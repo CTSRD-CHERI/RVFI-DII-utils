@@ -77,7 +77,24 @@ typedef struct {
     // XXX: SC writes something other than read value, but the value that would be read is unimportant.
     // Unsure what the point of this is, it's only relevant when the value is going to be in rd anyway.
     Bit#(xlen)    rvfi_mem_rdata; // [578 - 641] Read data:               Data read from mem_addr (i.e. before write)
-} RVFI_DII_Execution#(numeric type xlen, numeric type memwidth) deriving (Bits, Eq, FShow);
+} RVFI_DII_Execution#(numeric type xlen, numeric type memwidth) deriving (Bits, Eq);
+
+instance FShow#(RVFI_DII_Execution#(a, b));
+    function Fmt fshow (RVFI_DII_Execution#(a, b) x);
+        Fmt acc = $format("Order: %04d, PC: 0x%016h, I: 0x%08h, PCWD: 0x%016h, Trap: %b, RD: %02d, "
+                       , x.rvfi_order
+                       , x.rvfi_pc_rdata
+                       , x.rvfi_insn
+                       , x.rvfi_pc_wdata
+                       , x.rvfi_trap
+                       , x.rvfi_rd_addr
+                      );
+        if (x.rvfi_rd_addr != 0) acc = acc + $format("RWD: 0x%016h, ", x.rvfi_rd_wdata);
+        if (x.rvfi_mem_wmask != 0) acc = acc + $format("MA: 0x%016h, MWD: 0x%016h, ", x.rvfi_mem_addr, x.rvfi_mem_wdata);
+        acc = acc + $format("MWM: 0b%08b", x.rvfi_mem_wmask);
+        return acc;
+    endfunction
+endinstance
 
 typedef struct {
     Bit#(8)  rvfi_intr;      // [066 - 066] Trap handler:            Set for first instruction in trap handler.

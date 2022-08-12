@@ -90,8 +90,14 @@ instance FShow#(RVFI_DII_Execution#(a, b));
                        , x.rvfi_rd_addr
                       );
         if (x.rvfi_rd_addr != 0) acc = acc + $format("RWD: 0x%016h, ", x.rvfi_rd_wdata);
-        if (x.rvfi_mem_wmask != 0) acc = acc + $format("MA: 0x%016h, MWD: 0x%016h, ", x.rvfi_mem_addr, x.rvfi_mem_wdata);
-        acc = acc + $format("MWM: 0b%08b", x.rvfi_mem_wmask);
+        if (x.rvfi_mem_wmask != 0) begin
+          acc = acc + $format("MA: 0x%016h, MWD: 0x%016h, ", x.rvfi_mem_addr, x.rvfi_mem_wdata);
+          acc = acc + $format("MWM: 0b%08b", x.rvfi_mem_wmask);
+        end
+        if (x.rvfi_mem_rmask != 0) begin
+          acc = acc + $format("MA: 0x%016h ", x.rvfi_mem_addr);
+          acc = acc + $format("MRM: 0b%08b", x.rvfi_mem_rmask);
+        end
         return acc;
     endfunction
 endinstance

@@ -20,64 +20,11 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+#include "rvfi_dii_utils.h"
 #include "SocketPacketUtils/socket_packet_utils.h"
 
 #include <stdlib.h>
-
-#define for_all_dii_fields \
-  dii_field(dii_insn, uint32_t)\
-  dii_field(dii_time, uint16_t)\
-  dii_field(dii_cmd, uint8_t)\
-  dii_field(dii_pad, uint8_t)
-
-typedef struct {
-#define dii_field(name, type) type name;
-for_all_dii_fields
-#undef dii_field
-} dii_pkt_t;
-
-#define for_all_rvfi_fields \
-  rvfi_field(rvfi_order, uint64_t)\
-  rvfi_field(rvfi_pc_rdata, uint64_t)\
-  rvfi_field(rvfi_pc_wdata, uint64_t)\
-  rvfi_field(rvfi_insn, uint64_t)\
-  rvfi_field(rvfi_rs1_data, uint64_t)\
-  rvfi_field(rvfi_rs2_data, uint64_t)\
-  rvfi_field(rvfi_rd_wdata, uint64_t)\
-  rvfi_field(rvfi_mem_addr, uint64_t)\
-  rvfi_field(rvfi_mem_rdata, uint64_t)\
-  rvfi_field(rvfi_mem_wdata, uint64_t)\
-  rvfi_field(rvfi_mem_rmask, uint8_t )\
-  rvfi_field(rvfi_mem_wmask, uint8_t )\
-  rvfi_field(rvfi_rs1_addr, uint8_t )\
-  rvfi_field(rvfi_rs2_addr, uint8_t )\
-  rvfi_field(rvfi_rd_addr, uint8_t )\
-  rvfi_field(rvfi_trap, uint8_t )\
-  rvfi_field(rvfi_halt, uint8_t )\
-  rvfi_field(rvfi_intr, uint8_t )
-
-typedef struct {
-#define rvfi_field(name, type) type name;
-for_all_rvfi_fields
-#undef rvfi_field
-} rvfi_pkt_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-extern void rvfi_dii_bridge_rst (int log_buff_size);
-#define dii_field(name, type) extern type get_##name (int idx);
-for_all_dii_fields
-#undef dii_field
-extern void put_rvfi_pkt (
-  int idx
-#define rvfi_field(name, type) , type name
-for_all_rvfi_fields
-#undef rvfi_field
-);
-#ifdef __cplusplus
-}
-#endif
+#include <stdio.h>
 
 unsigned long long my_sock = 0;
 dii_pkt_t *dii_buff = 0;
@@ -105,6 +52,7 @@ void rvfi_dii_bridge_rst(int log_buff_size) {
 
 // Get the relevant whole packet, receiving from the network if required
 dii_pkt_t* dii_get(int idx) {
+  printf("dii_get! %i\n", idx);
   if (idx == enq_head) {
     int recv_cnt = 0;
     while (recv_cnt < sizeof dii_buff[0]) {
@@ -150,4 +98,29 @@ for_all_rvfi_fields
     rvfi_buff_fresh[deq_head] = false;
     deq_head = (deq_head + 1) % buff_size;
   }
+}
+
+extern void put_rvfi_pkt_wrap(int idx, const rvfi_pkt_t *pkt) {
+  put_rvfi_pkt(
+      idx
+#define rvfi_field(name, type) , pkt->name
+for_all_rvfi_fields
+#undef rvfi_field
+  );
+}
+
+void print_dii_pkt(const dii_pkt_t *pkt) {
+  printf("Begin DII Packet =========\n");
+  #define dii_field(name, type) printf("%s: %x\n", #name, pkt->name);
+  for_all_dii_fields
+  #undef dii_field
+  printf("End DII Packet ===========\n");
+}
+
+void print_rvfi_pkt(const rvfi_pkt_t *pkt) {
+  printf("Begin RVFI Packet ========\n");
+  #define rvfi_field(name, type) printf("%s: %lx\n", #name, (unsigned long int) pkt->name);
+  for_all_rvfi_fields
+  #undef rvfi_field
+  printf("End RVFI Packet ==========\n");
 }

@@ -52,7 +52,6 @@ void rvfi_dii_bridge_rst(int log_buff_size) {
 
 // Get the relevant whole packet, receiving from the network if required
 dii_pkt_t* dii_get(int idx) {
-  printf("dii_get! %i\n", idx);
   if (idx == enq_head) {
     int recv_cnt = 0;
     while (recv_cnt < sizeof dii_buff[0]) {
